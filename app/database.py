@@ -28,12 +28,16 @@ db_url = get_settings().database_url or "sqlite:////tmp/voice_agent.db"
 if db_url.startswith("sqlite:///./") and os.environ.get("VERCEL"):
     db_url = "sqlite:////tmp/voice_agent.db"
 
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
 connect_args = {"check_same_thread": False} if "sqlite" in db_url else {}
 
 try:
     engine = create_engine(db_url, connect_args=connect_args, future=True, pool_pre_ping=True)
-except Exception as e:
+except Exception:
     engine = create_engine("sqlite:////tmp/voice_agent.db", connect_args={"check_same_thread": False}, future=True)
+
 
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 

@@ -104,15 +104,21 @@ def get_calls(db: Session = Depends(get_db)) -> list[dict]:
 
 
 @app.post("/voice/incoming")
-async def incoming(request: Request, CallSid: str = Form(...), From: str = Form(""), db: Session = Depends(get_db)):
+async def incoming(request: Request, CallSid: str = Form("CA_default"), From: str = Form(""), db: Session = Depends(get_db)):
     verify_twilio(request, dict(await request.form()))
-    call = db.query(Call).filter(Call.twilio_call_sid == CallSid).one_or_none()
-    if not call:
-        call = Call(twilio_call_sid=CallSid, phone=From)
-        db.add(call)
-        db.commit()
-        db.refresh(call)
-    return gather_response(f"Thank you for calling {get_settings().business_name}. I can help book an appointment. May I have your name?", call.id)
+    call_id = 1
+    try:
+        call = db.query(Call).filter(Call.twilio_call_sid == CallSid).one_or_none()
+        if not call:
+            call = Call(twilio_call_sid=CallSid, phone=From)
+            db.add(call)
+            db.commit()
+            db.refresh(call)
+        call_id = call.id
+    except Exception as exc:
+        logging.warning("Incoming DB error fallback: %s", exc)
+
+    return gather_response(f"Thank you for calling {get_settings().business_name}. I can help book an appointment. May I have your name?", call_id)
 
 
 @app.post("/voice/gather/{call_id}")
@@ -125,11 +131,18 @@ async def gather(
     db: Session = Depends(get_db)
 ):
     verify_twilio(request, dict(await request.form()))
-    call = db.get(Call, call_id)
+    try:
+        call = db.get(Call, call_id)
+    except Exception as exc:
+        logging.warning("Gather DB get error: %s", exc)
+        call = None
+
     if not call:
-        raise HTTPException(status_code=404, detail="Call not found")
+        call = Call(id=call_id, twilio_call_sid=f"CA_{call_id}", state="welcome")
+
     if not SpeechResult:
-        return gather_response("I did not catch that. Please say it again.", call.id)
+        return gather_response("I did not catch that. Please say it again.", call_id)
+
     turn = await advance(call, SpeechResult, db)
     spoken_reply, routed_model = await polish_spoken_reply(
         turn.text,
@@ -138,18 +151,22 @@ async def gather(
         api_key=api_key
     )
 
-    if routed_model:
-        logging.info("Call %s used OpenRouter model %s", call.id, routed_model)
-    db.commit()
+    try:
+        db.commit()
+    except Exception as exc:
+        logging.warning("Gather DB commit error: %s", exc)
+
     if turn.should_escalate:
         response = VoiceResponse()
-        response.say(spoken_reply, voice="Polly.Aditi", language="en-IN")
+        response.say(spoken_reply or turn.text, voice="Polly.Aditi", language="en-IN")
         if get_settings().escalation_phone_number:
             response.append(Dial(get_settings().escalation_phone_number))
         else:
             response.say("Our team will call you back shortly.", voice="Polly.Aditi", language="en-IN")
         return Response(str(response), media_type="application/xml")
-    return gather_response(spoken_reply, call.id, end=turn.should_hang_up)
+
+    return gather_response(spoken_reply or turn.text, call_id, end=turn.should_hang_up)
+
 
 
 @app.post("/voice/retry/{call_id}")
