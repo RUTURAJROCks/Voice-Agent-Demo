@@ -6,6 +6,14 @@ from .config import get_settings
 logger = logging.getLogger(__name__)
 
 
+def ensure_question_preserved(reply: str, text: str) -> str:
+    if not text:
+        return reply
+    if "?" in reply and "?" not in text:
+        return reply
+    return text
+
+
 async def polish_spoken_reply(
     reply: str,
     *,
@@ -23,8 +31,8 @@ async def polish_spoken_reply(
     if not key:
         return reply, None
 
-    system_prompt = "You write short, warm phone-agent replies. Preserve every fact, question, and promise exactly. Never add details, prices, or booking confirmations. Return only the spoken words."
-    user_prompt = f"Conversation state: {state}\nRewrite this for speech in under 35 words:\n{reply}"
+    system_prompt = "You polish phone-agent replies for speech. You MUST keep every question asked in the input. Do NOT remove questions or truncate instructions."
+    user_prompt = f"Conversation state: {state}\nPolish this for phone speech without removing any questions:\n{reply}"
 
     try:
         async with httpx.AsyncClient(timeout=8) as client:
@@ -35,7 +43,7 @@ async def polish_spoken_reply(
                 res.raise_for_status()
                 data = res.json()
                 text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                return (text if text else reply), "gemini-2.5-flash"
+                return ensure_question_preserved(reply, text), "gemini-2.5-flash"
 
             elif provider == "chatgpt":
                 url = "https://api.openai.com/v1/chat/completions"
@@ -53,7 +61,7 @@ async def polish_spoken_reply(
                 res.raise_for_status()
                 data = res.json()
                 text = data["choices"][0]["message"]["content"].strip()
-                return (text if text else reply), "gpt-4o-mini"
+                return ensure_question_preserved(reply, text), "gpt-4o-mini"
 
             elif provider == "claude":
                 url = "https://api.anthropic.com/v1/messages"
@@ -72,7 +80,7 @@ async def polish_spoken_reply(
                 res.raise_for_status()
                 data = res.json()
                 text = data["content"][0]["text"].strip()
-                return (text if text else reply), "claude-3-5-sonnet"
+                return ensure_question_preserved(reply, text), "claude-3-5-sonnet"
 
             else:
                 url = "https://openrouter.ai/api/v1/chat/completions"
@@ -98,7 +106,8 @@ async def polish_spoken_reply(
                 if not content or not isinstance(content, str):
                     return reply, None
                 text = content.strip()
-                return (text if text else reply), data.get("model", settings.openrouter_primary_model)
+                return ensure_question_preserved(reply, text), data.get("model", settings.openrouter_primary_model)
+
 
     except Exception as exc:
         logger.warning("%s provider error; using fallback reply: %s", provider, exc)
