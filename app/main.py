@@ -60,11 +60,17 @@ def healthz() -> str:
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def dashboard() -> HTMLResponse:
-    index_path = os.path.join(os.path.dirname(__file__), "static", "index.html")
-    if os.path.exists(index_path):
-        with open(index_path, encoding="utf-8") as page:
-            return HTMLResponse(page.read())
-    return HTMLResponse("<h1>Voice AI Agent</h1>")
+    possible_paths = [
+        os.path.join(os.path.dirname(__file__), "static", "index.html"),
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "app", "static", "index.html"),
+        "app/static/index.html",
+    ]
+    for p in possible_paths:
+        if os.path.exists(p):
+            with open(p, encoding="utf-8") as page:
+                return HTMLResponse(page.read())
+    return HTMLResponse("<h1>Voice AI Lead Qualification Agent</h1><p>Website active.</p>")
+
 
 
 
