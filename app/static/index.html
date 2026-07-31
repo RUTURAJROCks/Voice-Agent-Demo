@@ -257,7 +257,7 @@
     <!-- RECENT CALL LOGS FROM DATABASE -->
     <section class="flow" style="padding-top: 60px;">
       <div class="section-title">
-        <span>RECENT CALL RECORDS (SQLITE DB)</span>
+        <span>RECENT CALL RECORDS (SUPABASE POSTGRES DB)</span>
         <a href="#" onclick="loadCalls(); return false;" style="color:var(--acid); text-decoration:none; font-family:'DM Mono';">↻ Refresh</a>
       </div>
       <div id="callsContainer">
@@ -304,26 +304,36 @@
     }).catch(()=>{});
 
     function loadCalls() {
-      fetch('/api/calls').then(r=>r.json()).then(calls=>{
-        const body = document.getElementById('callsBody');
-        if (!calls.length) {
+      fetch('/api/calls')
+        .then(r => {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(calls => {
+          const body = document.getElementById('callsBody');
+          if (!calls || !calls.length) {
+            body.innerHTML = '<tr><td colspan="8" style="color:var(--muted); text-align:center;">No calls logged yet.</td></tr>';
+            return;
+          }
+          body.innerHTML = calls.map(c => `
+            <tr>
+              <td>#${c.id}</td>
+              <td><span class="badge ${c.state}">${c.state}</span></td>
+              <td>${c.name || '—'}</td>
+              <td>${c.phone || '—'}</td>
+              <td>${c.service || '—'}</td>
+              <td>${c.location || '—'}</td>
+              <td>${c.requested_time || '—'}</td>
+              <td>${c.appointment_id ? '<span class="badge booked">'+c.appointment_id+'</span>' : '—'}</td>
+            </tr>
+          `).join('');
+        })
+        .catch(err => {
+          const body = document.getElementById('callsBody');
           body.innerHTML = '<tr><td colspan="8" style="color:var(--muted); text-align:center;">No calls logged yet.</td></tr>';
-          return;
-        }
-        body.innerHTML = calls.map(c => `
-          <tr>
-            <td>#${c.id}</td>
-            <td><span class="badge ${c.state}">${c.state}</span></td>
-            <td>${c.name || '—'}</td>
-            <td>${c.phone || '—'}</td>
-            <td>${c.service || '—'}</td>
-            <td>${c.location || '—'}</td>
-            <td>${c.requested_time || '—'}</td>
-            <td>${c.appointment_id ? '<span class="badge booked">'+c.appointment_id+'</span>' : '—'}</td>
-          </tr>
-        `).join('');
-      }).catch(()=>{});
+        });
     }
+
     loadCalls();
 
     function appendMsg(text, type) {

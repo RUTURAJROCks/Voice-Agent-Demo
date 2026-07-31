@@ -82,7 +82,12 @@ def status() -> dict:
 
 @app.get("/api/calls")
 def get_calls(db: Session = Depends(get_db)) -> list[dict]:
-    calls = db.query(Call).order_by(Call.id.desc()).limit(5).all()
+    try:
+        calls = db.query(Call).order_by(Call.id.desc()).limit(5).all()
+    except Exception as exc:
+        logging.warning("get_calls DB fallback: %s", exc)
+        calls = list(IN_MEMORY_CALLS.values())[-5:]
+        calls.reverse()
 
     return [
         {
@@ -96,10 +101,11 @@ def get_calls(db: Session = Depends(get_db)) -> list[dict]:
             "requested_time": c.requested_time,
             "appointment_id": c.appointment_id,
             "transcript": c.transcript,
-            "created_at": c.created_at.isoformat() if c.created_at else None,
+            "created_at": c.created_at.isoformat() if getattr(c, 'created_at', None) else None,
         }
         for c in calls
     ]
+
 
 
 
