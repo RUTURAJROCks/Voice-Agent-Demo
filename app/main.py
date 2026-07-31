@@ -40,17 +40,17 @@ def verify_twilio(request: Request, form: dict) -> None:
 
 
 def gather_response(prompt: str, call_id: int, *, end: bool = False) -> Response:
-    settings = get_settings()
     voice = VoiceResponse()
     voice.say(prompt, voice="Polly.Aditi", language="en-IN")
     if end:
         voice.hangup()
     else:
-        gather = Gather(input="speech", action=f"{settings.public_base_url}/voice/gather/{call_id}", method="POST", speech_timeout="auto", language="en-IN")
+        gather = Gather(input="speech", action=f"/voice/gather/{call_id}", method="POST", speech_timeout="auto", language="en-IN")
         gather.say("Please say that after the tone.", voice="Polly.Aditi", language="en-IN")
         voice.append(gather)
-        voice.redirect(f"{settings.public_base_url}/voice/retry/{call_id}", method="POST")
+        voice.redirect(f"/voice/retry/{call_id}", method="POST")
     return Response(str(voice), media_type="application/xml")
+
 
 
 @app.get("/healthz", response_class=PlainTextResponse)

@@ -47,6 +47,11 @@ def init_db() -> None:
 
 
 def get_db():
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as exc:
+        import logging
+        logging.warning("Auto table creation warning: %s", exc)
     db = SessionLocal()
     try:
         yield db
@@ -55,4 +60,5 @@ def get_db():
         raise
     finally:
         db.close()
+
 
