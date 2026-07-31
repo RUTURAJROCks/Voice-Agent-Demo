@@ -60,8 +60,12 @@ def healthz() -> str:
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def dashboard() -> HTMLResponse:
-    with open("app/static/index.html", encoding="utf-8") as page:
-        return HTMLResponse(page.read())
+    index_path = os.path.join(os.path.dirname(__file__), "static", "index.html")
+    if os.path.exists(index_path):
+        with open(index_path, encoding="utf-8") as page:
+            return HTMLResponse(page.read())
+    return HTMLResponse("<h1>Voice AI Agent</h1>")
+
 
 
 @app.get("/api/status")
