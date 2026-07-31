@@ -24,25 +24,35 @@ class Call(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
-import os
-
-db_url = get_settings().database_url
+db_url = get_settings().database_url or "sqlite:////tmp/voice_agent.db"
 if db_url.startswith("sqlite:///./") and os.environ.get("VERCEL"):
     db_url = "sqlite:////tmp/voice_agent.db"
 
 connect_args = {"check_same_thread": False} if "sqlite" in db_url else {}
-engine = create_engine(db_url, connect_args=connect_args, future=True)
+
+try:
+    engine = create_engine(db_url, connect_args=connect_args, future=True, pool_pre_ping=True)
+except Exception as e:
+    engine = create_engine("sqlite:////tmp/voice_agent.db", connect_args={"check_same_thread": False}, future=True)
+
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
 
-
 def init_db() -> None:
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as exc:
+        import logging
+        logging.warning("Warning initializing DB: %s", exc)
 
 
 def get_db():
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
+

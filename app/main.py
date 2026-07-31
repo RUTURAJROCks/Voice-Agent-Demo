@@ -11,14 +11,23 @@ from .database import Call, get_db, init_db
 from .flow import advance
 from .llm import polish_spoken_reply
 
+import os
+
 logging.basicConfig(level=logging.INFO)
 app = FastAPI(title="Voice AI Lead Qualification Agent", version="1.0.0")
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+static_dir = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(static_dir):
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 
 @app.on_event("startup")
 def startup() -> None:
-    init_db()
+    try:
+        init_db()
+    except Exception as exc:
+        logging.warning("Startup DB initialization warning: %s", exc)
+
 
 
 def verify_twilio(request: Request, form: dict) -> None:
