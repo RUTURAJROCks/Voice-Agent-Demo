@@ -103,20 +103,29 @@ def get_calls(db: Session = Depends(get_db)) -> list[dict]:
 
 
 
+import time
+
+IN_MEMORY_CALLS: dict[int, Call] = {}
+
+
 @app.post("/voice/incoming")
-async def incoming(request: Request, CallSid: str = Form("CA_default"), From: str = Form(""), db: Session = Depends(get_db)):
+async def incoming(request: Request, CallSid: str = Form(""), From: str = Form(""), db: Session = Depends(get_db)):
     verify_twilio(request, dict(await request.form()))
-    call_id = 1
+    if not CallSid:
+        CallSid = f"CA_web_{int(time.time() * 1000)}"
     try:
         call = db.query(Call).filter(Call.twilio_call_sid == CallSid).one_or_none()
         if not call:
-            call = Call(twilio_call_sid=CallSid, phone=From)
+            call = Call(twilio_call_sid=CallSid, phone=From, state="welcome")
             db.add(call)
             db.commit()
             db.refresh(call)
         call_id = call.id
     except Exception as exc:
         logging.warning("Incoming DB error fallback: %s", exc)
+        call_id = int(time.time() * 1000)
+        call = Call(id=call_id, twilio_call_sid=CallSid, phone=From, state="welcome")
+        IN_MEMORY_CALLS[call_id] = call
 
     return gather_response(f"Thank you for calling {get_settings().business_name}. I can help book an appointment. May I have your name?", call_id)
 
@@ -131,14 +140,17 @@ async def gather(
     db: Session = Depends(get_db)
 ):
     verify_twilio(request, dict(await request.form()))
+    call = None
     try:
         call = db.get(Call, call_id)
     except Exception as exc:
         logging.warning("Gather DB get error: %s", exc)
-        call = None
 
     if not call:
-        call = Call(id=call_id, twilio_call_sid=f"CA_{call_id}", state="welcome")
+        call = IN_MEMORY_CALLS.get(call_id)
+        if not call:
+            call = Call(id=call_id, twilio_call_sid=f"CA_{call_id}", state="welcome")
+            IN_MEMORY_CALLS[call_id] = call
 
     if not SpeechResult:
         return gather_response("I did not catch that. Please say it again.", call_id)
@@ -166,6 +178,7 @@ async def gather(
         return Response(str(response), media_type="application/xml")
 
     return gather_response(spoken_reply or turn.text, call_id, end=turn.should_hang_up)
+
 
 
 
