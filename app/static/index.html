@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Callflow — Voice AI Agent</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .sim-card {
+      border: 1px solid rgba(215, 255, 105, 0.25);
+      padding: 36px;
+      margin: 40px 0;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(215, 255, 105, 0.015) 100%);
+      backdrop-filter: blur(16px);
+      border-radius: 8px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      position: relative;
+    }
+    .sim-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .sim-title-group h2 {
+      font-size: 30px;
+      letter-spacing: -0.05em;
+      margin: 6px 0 0 0;
+    }
+    .config-bar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--line);
+      padding: 12px 16px;
+      border-radius: 6px;
+    }
+    .config-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .config-label {
+      font: 10px 'DM Mono', monospace;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .config-select, .config-input {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: var(--ink);
+      padding: 8px 12px;
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      border-radius: 4px;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .config-select:focus, .config-input:focus {
+      border-color: var(--acid);
+      box-shadow: 0 0 12px rgba(215, 255, 105, 0.2);
+    }
+    .config-input {
+      width: 220px;
+    }
+    .sim-chat {
+      height: 280px;
+      overflow-y: auto;
+      border: 1px solid var(--line);
+      padding: 20px;
+      margin: 20px 0;
+      background: rgba(5, 7, 10, 0.7);
+      border-radius: 6px;
+      box-shadow: inset 0 2px 10px rgba(0,0,0,0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .msg-bubble {
+      max-width: 85%;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.5;
+      animation: fadeIn 0.25s ease-out;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .msg-bubble.agent {
+      align-self: flex-start;
+      background: rgba(215, 255, 105, 0.08);
+      border: 1px solid rgba(215, 255, 105, 0.25);
+      color: var(--ink);
+    }
+    .msg-bubble.agent b {
+      color: var(--acid);
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      display: block;
+      margin-bottom: 4px;
+      letter-spacing: 0.08em;
+    }
+    .msg-bubble.user {
+      align-self: flex-end;
+      background: rgba(129, 161, 193, 0.12);
+      border: 1px solid rgba(129, 161, 193, 0.3);
+      color: var(--ink);
+    }
+    .msg-bubble.user b {
+      color: #81a1c1;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      display: block;
+      margin-bottom: 4px;
+      letter-spacing: 0.08em;
+    }
+    .msg-system {
+      align-self: center;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      font-style: italic;
+      padding: 4px 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+    }
+    .sim-controls {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .sim-input {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--line);
+      color: var(--ink);
+      padding: 14px 18px;
+      font-family: inherit;
+      font-size: 14px;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+    .sim-input:focus {
+      border-color: var(--acid);
+      background: rgba(255, 255, 255, 0.07);
+      outline: none;
+    }
+    .btn-mic.active {
+      background: rgba(255, 105, 105, 0.2);
+      border-color: #ff6969;
+      color: #ff6969;
+      animation: pulseMic 1.2s infinite;
+    }
+    @keyframes pulseMic { 50% { opacity: 0.5; } }
+    .calls-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      font-size: 13px;
+    }
+    .calls-table th, .calls-table td {
+      border: 1px solid var(--line);
+      padding: 14px;
+      text-align: left;
+    }
+    .calls-table th {
+      background: rgba(255, 255, 255, 0.03);
+      font-family: 'DM Mono', monospace;
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-family: 'DM Mono', monospace;
+      text-transform: uppercase;
+    }
+    .badge.booked { background: rgba(215,255,105,0.2); color: var(--acid); border: 1px solid var(--acid); }
+    .badge.escalated { background: rgba(255,105,105,0.2); color: #ff6969; border: 1px solid #ff6969; }
+    .badge.active { background: rgba(100,180,255,0.2); color: #64b4ff; border: 1px solid #64b4ff; }
+  </style>
+</head>
+<body>
+  <div class="orb orb-one"></div><div class="orb orb-two"></div><div class="grid"></div>
+  <main>
+    <nav>
+      <a class="brand" href="/"><span class="brand-mark">⌁</span> CALLFLOW</a>
+      <span class="live"><i></i> SYSTEM ONLINE</span>
+    </nav>
+
+    <!-- ORIGINAL HERO DESIGN -->
+    <section class="hero">
+      <div class="eyebrow">VOICE OPERATIONS, REIMAGINED</div>
+      <h1>Every call, <em>handled.</em></h1>
+      <p class="lede">An AI receptionist that qualifies leads, books appointments, and knows when to bring in your team.</p>
+      <div class="actions">
+        <a class="button primary" href="#simulator">Explore the flow <span>→</span></a>
+      </div>
+
+      <div class="signal">
+        <div class="wave"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div>
+        <span>Inbound call intelligence</span>
+      </div>
+    </section>
+
+    <!-- BROWSER VOICE AGENT TESTER CARD -->
+    <section id="simulator" class="sim-card">
+      <div class="sim-header">
+        <div class="sim-title-group">
+          <div class="eyebrow" style="color: var(--acid);">BROWSER VOICE AGENT TESTER</div>
+          <h2>Browser Voice Agent Tester</h2>
+        </div>
+
+        <div class="config-bar">
+          <div class="config-field">
+            <span class="config-label">API Provider</span>
+            <select id="providerSelect" class="config-select">
+              <option value="openrouter" selected>OpenRouter</option>
+              <option value="gemini">Gemini</option>
+              <option value="chatgpt">ChatGPT</option>
+              <option value="claude">Claude</option>
+            </select>
+          </div>
+          <div class="config-field">
+            <span class="config-label">API Key (Required)</span>
+            <input type="password" id="apiKeyInput" class="config-input" placeholder="Enter API Key">
+          </div>
+
+        </div>
+      </div>
+
+      <div class="sim-chat" id="chatBox">
+        <div class="msg-system">Click "Start Call" to initiate voice session.</div>
+      </div>
+
+      <div class="sim-controls">
+        <button id="callBtn" class="button primary" onclick="toggleCall()">Start Call 📞</button>
+        <input type="text" id="userInput" class="sim-input" placeholder="Type message or click Mic..." disabled onkeypress="if(event.key==='Enter') sendInput()">
+        <button id="sendBtn" class="button ghost" onclick="sendInput()" disabled>Send 💬</button>
+        <button id="micBtn" class="button ghost btn-mic" onclick="toggleMic()" disabled>🎙️ Mic</button>
+      </div>
+    </section>
+
+    <section class="metrics">
+      <article><strong>24/7</strong><span>Call coverage</span></article>
+      <article><strong>&lt;1 min</strong><span>Lead qualification</span></article>
+      <article><strong>3×</strong><span>Model resilience</span></article>
+    </section>
+
+    <!-- RECENT CALL LOGS FROM DATABASE -->
+    <section class="flow" style="padding-top: 60px;">
+      <div class="section-title">
+        <span>RECENT CALL RECORDS (SQLITE DB)</span>
+        <a href="#" onclick="loadCalls(); return false;" style="color:var(--acid); text-decoration:none; font-family:'DM Mono';">↻ Refresh</a>
+      </div>
+      <div id="callsContainer">
+        <table class="calls-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>State</th>
+              <th>Name</th>
+              <th>Phone</th>
+              <th>Service</th>
+              <th>Location</th>
+              <th>Time</th>
+              <th>Appointment</th>
+            </tr>
+          </thead>
+          <tbody id="callsBody">
+            <tr><td colspan="8" style="color:var(--muted); text-align:center;">Loading call records...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="router">
+      <div>
+        <div class="eyebrow">INTELLIGENT FAILOVER</div>
+        <h2>One conversation.<br><em>Three capable minds.</em></h2>
+      </div>
+      <div class="models" id="models">
+        <div class="model active"><i></i><span>Loading AI configuration…</span></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    let activeCallId = null;
+    let recognition = null;
+    let isCalling = false;
+
+    fetch('/api/status').then(r=>r.json()).then(s=>{
+      const m=document.querySelector('#models');
+      const all=[s.primary_model,...s.fallback_models];
+      m.innerHTML=all.map((x,i)=>`<div class="model ${i===0?'active':''}"><i></i><span>${i===0?'Primary':'Fallback '+i}</span><b>${x}</b></div>`).join('');
+    }).catch(()=>{});
+
+    function loadCalls() {
+      fetch('/api/calls').then(r=>r.json()).then(calls=>{
+        const body = document.getElementById('callsBody');
+        if (!calls.length) {
+          body.innerHTML = '<tr><td colspan="8" style="color:var(--muted); text-align:center;">No calls logged yet.</td></tr>';
+          return;
+        }
+        body.innerHTML = calls.map(c => `
+          <tr>
+            <td>#${c.id}</td>
+            <td><span class="badge ${c.state}">${c.state}</span></td>
+            <td>${c.name || '—'}</td>
+            <td>${c.phone || '—'}</td>
+            <td>${c.service || '—'}</td>
+            <td>${c.location || '—'}</td>
+            <td>${c.requested_time || '—'}</td>
+            <td>${c.appointment_id ? '<span class="badge booked">'+c.appointment_id+'</span>' : '—'}</td>
+          </tr>
+        `).join('');
+      }).catch(()=>{});
+    }
+    loadCalls();
+
+    function appendMsg(text, type) {
+      const box = document.getElementById('chatBox');
+      const div = document.createElement('div');
+
+      if (type === 'system') {
+        div.className = 'msg-system';
+        div.innerText = text;
+      } else {
+        div.className = `msg-bubble ${type}`;
+        div.innerHTML = `<b>${type === 'agent' ? '🤖 VOICE AGENT' : '🗣️ CALLER'}</b>${text}`;
+      }
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function speak(text) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = 'en-IN';
+        u.rate = 1.0;
+        window.speechSynthesis.speak(u);
+      }
+    }
+
+    function parseSay(xmlStr) {
+      try {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlStr, "text/xml");
+        const sayElems = Array.from(xmlDoc.getElementsByTagName("Say"));
+        if (sayElems.length > 0) {
+          return sayElems[0].textContent.trim();
+        }
+      } catch (e) {}
+      const match = xmlStr.match(/<Say[^>]*>(.*?)<\/Say>/i);
+      return match ? match[1].replace(/<\/?[^>]+(>|$)/g, "").trim() : xmlStr;
+    }
+
+    async function toggleCall() {
+      if (isCalling) {
+        endCall();
+        return;
+      }
+      isCalling = true;
+      document.getElementById('callBtn').innerText = 'End Call ⏹️';
+      document.getElementById('userInput').disabled = false;
+      document.getElementById('sendBtn').disabled = false;
+      document.getElementById('micBtn').disabled = false;
+
+      appendMsg('Connecting to AI Voice Server...', 'system');
+      const sid = 'CA_web_' + Date.now();
+      const form = new FormData();
+      form.append('CallSid', sid);
+      form.append('From', '+919876543210');
+
+      const res = await fetch('/voice/incoming', { method: 'POST', body: form });
+      const xml = await res.text();
+      const text = parseSay(xml);
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xml, "text/xml");
+      const gather = doc.querySelector("Gather");
+      if (gather && gather.getAttribute("action")) {
+        const parts = gather.getAttribute("action").split('/');
+        activeCallId = parts[parts.length - 1];
+      } else {
+        activeCallId = 1;
+      }
+
+      appendMsg(text, 'agent');
+      speak(text);
+      loadCalls();
+    }
+
+    async function sendInput() {
+      const input = document.getElementById('userInput');
+      const val = input.value.trim();
+      if (!val || !activeCallId) return;
+
+      const provider = document.getElementById('providerSelect').value;
+      const apiKey = document.getElementById('apiKeyInput').value.trim();
+
+      if (!apiKey) {
+        appendMsg(`API Key Required: Please enter your ${provider.toUpperCase()} API key in the top control bar!`, 'system');
+        document.getElementById('apiKeyInput').focus();
+        return;
+      }
+
+      appendMsg(val, 'user');
+      input.value = '';
+
+      const form = new FormData();
+      form.append('SpeechResult', val);
+      form.append('provider', provider);
+      form.append('api_key', apiKey);
+
+
+      const res = await fetch(`/voice/gather/${activeCallId}`, { method: 'POST', body: form });
+      const xml = await res.text();
+      const text = parseSay(xml);
+
+      appendMsg(text, 'agent');
+      speak(text);
+      loadCalls();
+
+      if (xml.includes('<Hangup') || xml.includes('<Dial') || xml.includes('booked')) {
+        endCall();
+      }
+    }
+
+    function endCall() {
+      isCalling = false;
+      activeCallId = null;
+      document.getElementById('callBtn').innerText = 'Start Call 📞';
+      document.getElementById('userInput').disabled = true;
+      document.getElementById('sendBtn').disabled = true;
+      document.getElementById('micBtn').disabled = true;
+      document.getElementById('micBtn').classList.remove('active');
+      document.getElementById('micBtn').innerText = '🎙️ Mic';
+      appendMsg('Call session completed.', 'system');
+      loadCalls();
+    }
+
+    function toggleMic() {
+      const btn = document.getElementById('micBtn');
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        alert('Speech recognition is not supported in this browser. Please use Chrome or Edge, or type in the input box!');
+        return;
+      }
+
+      if (recognition) {
+        try { recognition.stop(); } catch(e){}
+        recognition = null;
+        btn.classList.remove('active');
+        btn.innerText = '🎙️ Mic';
+        return;
+      }
+
+      recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      btn.classList.add('active');
+      btn.innerText = '🔴 Listening...';
+      appendMsg('Listening to microphone...', 'system');
+
+      recognition.onresult = (e) => {
+        const text = e.results[0][0].transcript;
+        appendMsg('Speech recognized: "' + text + '"', 'system');
+        document.getElementById('userInput').value = text;
+        btn.classList.remove('active');
+        btn.innerText = '🎙️ Mic';
+        recognition = null;
+        sendInput();
+      };
+
+      recognition.onerror = (err) => {
+        appendMsg('Mic notice: Please type your reply in the text box.', 'system');
+        btn.classList.remove('active');
+        btn.innerText = '🎙️ Mic';
+        recognition = null;
+      };
+
+      recognition.onend = () => {
+        btn.classList.remove('active');
+        btn.innerText = '🎙️ Mic';
+        recognition = null;
+      };
+
+      try {
+        recognition.start();
+      } catch (err) {
+        btn.classList.remove('active');
+        btn.innerText = '🎙️ Mic';
+        recognition = null;
+      }
+    }
+  </script>
+</body>
+</html>
