@@ -28,8 +28,11 @@ db_url = get_settings().database_url or "sqlite:////tmp/voice_agent.db"
 if db_url.startswith("sqlite:///./") and os.environ.get("VERCEL"):
     db_url = "sqlite:////tmp/voice_agent.db"
 
-if db_url.startswith("postgres://"):
+if "postgresql+psycopg://" in db_url:
+    db_url = db_url.replace("postgresql+psycopg://", "postgresql://", 1)
+elif db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
+
 
 connect_args = {"check_same_thread": False} if "sqlite" in db_url else {}
 
